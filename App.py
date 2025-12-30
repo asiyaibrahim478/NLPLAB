@@ -1,498 +1,781 @@
-"""
-Girls' Hostel Chatbot - Complete Console Application
-A friendly, supportive chatbot system for managing hostel activities
-Run with: python app.py
-"""
-
+import streamlit as st
 import json
 import os
-from datetime import datetime
+from datetime import datetime, date
 import random
 
 # ============================================================================
-# DATA PERSISTENCE FUNCTIONS
+# CONFIGURATION & DATA INITIALIZATION
 # ============================================================================
 
-def load_json_file(filename):
-    """Load data from a JSON file, return empty list if file doesn't exist"""
-    if os.path.exists(filename):
-        try:
-            with open(filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return []
-    return []
+# File paths for persistent storage
+COMPLAINTS_FILE = "complaints.json"
+ATTENDANCE_FILE = "attendance.json"
+EVENTS_FILE = "events.json"
 
-def save_json_file(filename, data):
-    """Save data to a JSON file"""
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-# ============================================================================
-# HARDCODED DATA
-# ============================================================================
-
+# Hardcoded data
 HOSTEL_RULES = [
-    "🕐 Curfew time is 9:00 PM on weekdays and 10:00 PM on weekends",
-    "🔇 Maintain silence after 10:00 PM",
-    "🚫 No outside guests allowed in rooms",
-    "🧹 Keep your room and common areas clean",
-    "💡 Switch off lights and fans when leaving the room",
-    "🍽️ Mess timings: Breakfast (7-9 AM), Lunch (12-2 PM), Dinner (7-9 PM)",
-    "👗 Dress modestly in common areas",
-    "🚿 Use water responsibly",
-    "📱 Keep valuables secure - hostel is not responsible for lost items",
-    "💞 Be respectful and kind to your hostel mates"
+    "🕐 Curfew time is 10:00 PM on weekdays and 11:00 PM on weekends",
+    "🔇 Maintain silence after 11:00 PM to respect others' study time",
+    "👭 Visitors are allowed only in the common room between 4:00 PM - 8:00 PM",
+    "🧹 Keep your room and common areas clean and tidy",
+    "🍽️ Inform the mess in-charge 2 hours in advance if you'll miss a meal",
+    "💧 Report any maintenance issues immediately to the warden",
+    "🚫 Smoking, alcohol, and drugs are strictly prohibited",
+    "🎵 Use headphones when listening to music or watching videos",
+    "👗 Proper attire must be worn in common areas",
+    "💝 Be kind, supportive, and respectful to all hostel sisters"
 ]
 
-EMERGENCY_CONTACTS = {
-    "🏥 Hostel Warden": "0300-1234567",
-    "👮 Security Guard": "0300-7654321",
-    "🚑 Medical Emergency": "0300-9876543",
-    "🔥 Fire Emergency": "115",
-    "👮 Police": "15",
-    "🏥 Campus Clinic": "0300-1112223",
-    "🔧 Maintenance": "0300-3334445"
-}
-
-WEEKLY_MESS_MENU = {
+WEEKLY_MENU = {
     "Monday": {
-        "Breakfast": "Paratha, Yogurt, Tea ☕",
-        "Lunch": "Rice, Daal, Chicken Curry, Salad 🍛",
-        "Dinner": "Roti, Mixed Vegetables, Raita 🥗"
+        "Breakfast": "Aloo Paratha, Curd, Pickle, Tea/Coffee",
+        "Lunch": "Dal Makhani, Jeera Rice, Roti, Mix Veg, Salad",
+        "Dinner": "Rajma, Rice, Roti, Paneer Butter Masala, Gulab Jamun"
     },
     "Tuesday": {
-        "Breakfast": "Halwa Puri, Chanay, Tea ☕",
-        "Lunch": "Biryani, Raita, Salad 🍚",
-        "Dinner": "Roti, Daal Mash, Fried Fish 🐟"
+        "Breakfast": "Poha, Banana, Tea/Coffee",
+        "Lunch": "Chole, Rice, Roti, Aloo Gobi, Raita",
+        "Dinner": "Dal Fry, Rice, Roti, Bhindi Masala, Curd"
     },
     "Wednesday": {
-        "Breakfast": "Omelet, Bread, Tea ☕",
-        "Lunch": "Rice, Daal, Vegetable Qorma, Salad 🥘",
-        "Dinner": "Roti, Palak Gosht, Raita 🍲"
+        "Breakfast": "Idli Sambhar, Coconut Chutney, Tea/Coffee",
+        "Lunch": "Kadhi Pakora, Rice, Roti, Baingan Bharta, Salad",
+        "Dinner": "Chana Masala, Rice, Roti, Palak Paneer, Kheer"
     },
     "Thursday": {
-        "Breakfast": "Paratha, Fried Egg, Tea ☕",
-        "Lunch": "Pulao, Chicken Karahi, Salad 🍗",
-        "Dinner": "Roti, Mixed Daal, Potato Curry 🥔"
+        "Breakfast": "Bread Butter Jam, Boiled Eggs, Tea/Coffee",
+        "Lunch": "Dal Tadka, Veg Pulao, Roti, Mix Veg, Pickle",
+        "Dinner": "Rajma, Rice, Chapati, Aloo Matar, Fruit Custard"
     },
     "Friday": {
-        "Breakfast": "Nihari, Naan, Tea ☕",
-        "Lunch": "Rice, Daal, Beef Qeema, Salad 🍖",
-        "Dinner": "Roti, Chicken Jalfrezi, Raita 🌶️"
+        "Breakfast": "Upma, Apple, Tea/Coffee",
+        "Lunch": "Sambar, Rice, Roti, Cabbage Sabzi, Papad",
+        "Dinner": "Special Biryani, Raita, Paneer Tikka, Ice Cream"
     },
     "Saturday": {
-        "Breakfast": "Aloo Paratha, Yogurt, Tea ☕",
-        "Lunch": "Fried Rice, Manchurian, Salad 🍜",
-        "Dinner": "Pizza/Pasta Night 🍕"
+        "Breakfast": "Puri Bhaji, Sweet, Tea/Coffee",
+        "Lunch": "Chole Bhature, Rice, Salad, Lassi",
+        "Dinner": "Dal Makhani, Jeera Rice, Naan, Kadai Paneer, Gajar Halwa"
     },
     "Sunday": {
-        "Breakfast": "Pancakes, Honey, Tea ☕",
-        "Lunch": "Chicken Biryani, Raita, Salad 🍛",
-        "Dinner": "Roti, Daal, Mixed Vegetables 🥗"
+        "Breakfast": "Sandwich, Cornflakes, Milk, Tea/Coffee",
+        "Lunch": "Special Thali - Dal, Rice, Puri, 3 Sabzis, Sweet",
+        "Dinner": "Chinese Special - Fried Rice, Manchurian, Spring Rolls, Soup"
     }
 }
 
+EMERGENCY_CONTACTS = [
+    {"name": "Warden - Ms. Priya Sharma", "number": "📞 +91-98765-43210"},
+    {"name": "Assistant Warden", "number": "📞 +91-98765-43211"},
+    {"name": "Security Office", "number": "📞 +91-98765-43212"},
+    {"name": "Medical Emergency", "number": "🚑 +91-98765-43213"},
+    {"name": "Mess In-charge", "number": "📞 +91-98765-43214"},
+    {"name": "Maintenance", "number": "🔧 +91-98765-43215"},
+    {"name": "Police Emergency", "number": "🚨 100"},
+    {"name": "Women's Helpline", "number": "📞 1091"},
+]
+
 MOTIVATIONAL_QUOTES = [
-    "💪 You are stronger than you think! Keep pushing forward!",
-    "✨ Believe in yourself and all that you are. You're capable of amazing things!",
-    "🌟 Every day is a new opportunity to be better than yesterday!",
-    "💖 You are enough, just as you are. Keep shining!",
-    "🦋 Difficult roads often lead to beautiful destinations!",
-    "🌈 Your potential is endless. Keep going!",
-    "👑 Be a girl with a mind, a woman with attitude, and a lady with class!",
-    "💝 She believed she could, so she did!",
-    "🌸 Strong women lift each other up!",
-    "⭐ You are the author of your own story. Make it inspiring!",
-    "🎯 Focus on your goals, not your fear!",
-    "💕 Be fearless in the pursuit of what sets your soul on fire!",
-    "🌺 Empower yourself! You have the power to change your life!",
-    "🎓 Education is the most powerful weapon you can use to change the world!",
-    "💎 You are precious, unique, and irreplaceable!"
+    "You are braver than you believe, stronger than you seem, and smarter than you think. 💪",
+    "She believed she could, so she did. Keep shining, sister! ✨",
+    "Your education is your superpower. Use it to change the world! 📚",
+    "Strong women lift each other up. Be that woman! 🌟",
+    "You are capable of amazing things. Never doubt yourself! 💖",
+    "Education is the key to unlock the golden door of freedom. 🗝️",
+    "Empowered women empower women. Let's grow together! 🌸",
+    "Your only limit is you. Break barriers and achieve greatness! 🚀",
+    "Be fearless in the pursuit of what sets your soul on fire! 🔥",
+    "You are enough, just as you are. Keep being amazing! 💝"
 ]
 
-HEALTH_STUDY_TIPS = [
-    "💧 Drink at least 8 glasses of water daily to stay hydrated!",
-    "🥗 Eat plenty of fruits and vegetables for better concentration!",
-    "😴 Get 7-8 hours of sleep for optimal brain function!",
-    "🏃 Exercise for 30 minutes daily - even a walk helps!",
-    "📚 Study in 25-minute focused sessions (Pomodoro Technique)!",
-    "🧘 Practice meditation or deep breathing to reduce stress!",
-    "📝 Make a to-do list every morning to stay organized!",
-    "🎧 Listen to calming music while studying for better focus!",
-    "👭 Form study groups with friends for better understanding!",
-    "📱 Take breaks from screens to protect your eyes!",
-    "🍎 Never skip breakfast - it's fuel for your brain!",
-    "📖 Read for 20 minutes before bed to improve sleep quality!",
-    "🌞 Get some sunlight every day for Vitamin D!",
-    "🧠 Practice active recall instead of just re-reading notes!",
-    "💆 Take care of your mental health - talk to someone if stressed!"
+HEALTH_TIPS = [
+    "💧 Stay hydrated! Drink at least 8 glasses of water daily for glowing skin and better concentration.",
+    "🩸 Track your period cycle and maintain good menstrual hygiene. Keep necessary supplies stocked.",
+    "🧘‍♀️ Practice 10 minutes of meditation or yoga daily to reduce stress and improve focus.",
+    "😴 Get 7-8 hours of sleep for better memory retention and overall health.",
+    "🥗 Eat iron-rich foods like spinach, dates, and jaggery, especially during your periods.",
+    "📱 Take regular breaks from screens to avoid eye strain and headaches.",
+    "🚶‍♀️ Walk for 30 minutes daily - it helps with period cramps and boosts mood!",
+    "🧠 Take short study breaks every 45 minutes to improve productivity and retention.",
+    "💆‍♀️ Don't ignore persistent pain or discomfort. Consult the medical room immediately.",
+    "🌞 Get some sunlight daily for Vitamin D - great for bones and mood!",
+    "🍎 Keep healthy snacks handy to avoid junk food during late-night study sessions.",
+    "💝 Talk to friends or counselors if you're feeling stressed or anxious. You're not alone!"
 ]
 
 # ============================================================================
-# DISPLAY FUNCTIONS
+# HELPER FUNCTIONS FOR DATA PERSISTENCE
 # ============================================================================
 
-def print_header(text):
-    """Print a decorative header"""
-    print("\n" + "=" * 60)
-    print(f"  {text}")
-    print("=" * 60)
-
-def print_separator():
-    """Print a separator line"""
-    print("-" * 60)
-
-def press_enter():
-    """Wait for user to press Enter"""
-    input("\n✨ Press Enter to continue...")
-
-# ============================================================================
-# FEATURE FUNCTIONS
-# ============================================================================
-
-def view_hostel_rules():
-    """Display hostel rules"""
-    print_header("📋 HOSTEL RULES & REGULATIONS")
-    print("\n💝 Dear Resident, please follow these rules for a harmonious living:\n")
-    for i, rule in enumerate(HOSTEL_RULES, 1):
-        print(f"  {i}. {rule}")
-    print("\n💕 Thank you for your cooperation!")
-    press_enter()
-
-def show_mess_menu():
-    """Display today's mess menu"""
-    print_header("🍽️ TODAY'S MESS MENU")
-    
-    # Get current day of week
-    today = datetime.now().strftime("%A")
-    
-    if today in WEEKLY_MESS_MENU:
-        menu = WEEKLY_MESS_MENU[today]
-        print(f"\n📅 Day: {today}\n")
-        print(f"  🌅 Breakfast: {menu['Breakfast']}")
-        print(f"  ☀️ Lunch: {menu['Lunch']}")
-        print(f"  🌙 Dinner: {menu['Dinner']}")
-        print("\n🥘 Enjoy your meal!")
-    else:
-        print("\n❌ Menu not available for today.")
-    
-    press_enter()
-
-def submit_complaint():
-    """Submit a new complaint"""
-    print_header("📝 SUBMIT A COMPLAINT")
-    
-    print("\n💬 We're here to help! Please share your concern:\n")
-    
+def load_json(filepath, default=None):
+    """Load data from JSON file"""
+    if default is None:
+        default = []
     try:
-        name = input("  👤 Your Name: ").strip()
-        if not name:
-            print("\n❌ Name cannot be empty!")
-            press_enter()
-            return
-        
-        room = input("  🚪 Room Number: ").strip()
-        if not room:
-            print("\n❌ Room number cannot be empty!")
-            press_enter()
-            return
-        
-        complaint = input("  💭 Your Complaint: ").strip()
-        if not complaint:
-            print("\n❌ Complaint cannot be empty!")
-            press_enter()
-            return
-        
-        # Load existing complaints
-        complaints = load_json_file('complaints.json')
-        
-        # Create new complaint
-        new_complaint = {
-            "id": len(complaints) + 1,
-            "name": name,
-            "room": room,
-            "complaint": complaint,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "status": "Pending"
-        }
-        
-        complaints.append(new_complaint)
-        save_json_file('complaints.json', complaints)
-        
-        print("\n✅ Your complaint has been submitted successfully!")
-        print("📌 We'll address it as soon as possible.")
-        print("💝 Thank you for bringing this to our attention!")
-        
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        return default
     except Exception as e:
-        print(f"\n❌ Error: {e}")
-    
-    press_enter()
+        st.error(f"Error loading {filepath}: {e}")
+        return default
 
-def view_upcoming_events():
-    """Display upcoming events"""
-    print_header("🎉 UPCOMING EVENTS")
-    
-    events = load_json_file('events.json')
-    
-    if not events:
-        print("\n📅 No upcoming events scheduled at the moment.")
-        print("💭 Check back later for exciting updates!")
-    else:
-        print("\n🌟 Here's what's coming up:\n")
-        for i, event in enumerate(events, 1):
-            print(f"  {i}. 🎊 {event['name']}")
-            print(f"     📅 Date: {event['date']}")
-            print(f"     📝 Details: {event['details']}")
-            print_separator()
-    
-    press_enter()
-
-def mark_attendance():
-    """Mark daily attendance"""
-    print_header("✅ MARK ATTENDANCE")
-    
-    print("\n📋 Daily attendance system\n")
-    
+def save_json(filepath, data):
+    """Save data to JSON file"""
     try:
-        name = input("  👤 Your Name: ").strip()
-        if not name:
-            print("\n❌ Name cannot be empty!")
-            press_enter()
-            return
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=4)
+        return True
+    except Exception as e:
+        st.error(f"Error saving {filepath}: {e}")
+        return False
+
+# ============================================================================
+# PAGE CONFIGURATION
+# ============================================================================
+
+st.set_page_config(
+    page_title="Girls Hostel Assistant",
+    page_icon="🏡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for beautiful styling
+st.markdown("""
+    <style>
+    .main {
+        background: linear-gradient(135deg, #ffeef8 0%, #fff5f7 100%);
+    }
+    .stButton>button {
+        background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 100%);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(90deg, #fecfef 0%, #ff9a9e 100%);
+    }
+    h1, h2, h3 {
+        color: #d63384;
+    }
+    .sidebar .sidebar-content {
+        background: linear-gradient(180deg, #fff0f6 0%, #ffe4f1 100%);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ============================================================================
+# HEADER
+# ============================================================================
+
+st.markdown("<h1 style='text-align: center; color: #d63384;'>🏡 Girls Hostel Assistant 🏡</h1>", 
+            unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #e685b5;'>Hello Sister! How can I help you today? 😊</h3>", 
+            unsafe_allow_html=True)
+st.markdown("---")
+
+# ============================================================================
+# SIDEBAR NAVIGATION
+# ============================================================================
+
+st.sidebar.image("https://img.icons8.com/clouds/200/null/home.png", width=150)
+st.sidebar.markdown("### 💝 Navigation Menu")
+st.sidebar.markdown("---")
+
+menu_options = [
+    "🏠 Home / Welcome",
+    "📋 Hostel Rules",
+    "🍽️ Today's Mess Menu",
+    "📝 Submit Complaint",
+    "👀 View Complaints",
+    "✅ Mark Attendance",
+    "🎉 Upcoming Events",
+    "➕ Add Event",
+    "🚨 Emergency Contacts",
+    "✨ Motivational Quote",
+    "💖 Health & Study Tips",
+    "📊 Statistics Dashboard"
+]
+
+selected_menu = st.sidebar.selectbox("Choose an option:", menu_options)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 💌 About")
+st.sidebar.info("This is your friendly hostel assistant, designed with love to make your hostel life easier and happier! 🌸")
+
+# ============================================================================
+# MAIN CONTENT SECTIONS
+# ============================================================================
+
+# HOME / WELCOME
+if selected_menu == "🏠 Home / Welcome":
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("## 🌸 Welcome to Your Home Away From Home!")
+        st.markdown("""
+        Dear Sister,
         
-        room = input("  🚪 Room Number: ").strip()
-        if not room:
-            print("\n❌ Room number cannot be empty!")
-            press_enter()
-            return
+        We're so happy to have you here! This hostel assistant is designed to make your life 
+        easier and more comfortable. Whether you need to check the mess menu, submit a complaint, 
+        mark attendance, or just need some motivation - we're here for you! 💝
         
-        # Load existing attendance
-        attendance_records = load_json_file('attendance.json')
+        **Quick Access:**
+        - 📋 Check our hostel rules to stay updated
+        - 🍽️ See what's cooking in the mess today
+        - 📝 Submit any complaints or suggestions
+        - ✅ Mark your daily attendance
+        - 🎉 Stay updated with upcoming events
+        - 🚨 Quick access to emergency contacts
         
-        # Check if already marked today
-        today = datetime.now().strftime("%Y-%m-%d")
-        already_marked = any(
-            record['name'].lower() == name.lower() and 
-            record['date'] == today 
-            for record in attendance_records
-        )
+        Remember, we're all sisters here. Let's support each other and make this hostel 
+        feel like home! 🏡
         
-        if already_marked:
-            print("\n⚠️ You've already marked your attendance today!")
-            print("💝 See you tomorrow!")
+        *With love,*  
+        *Your Hostel Team* 💕
+        """)
+    
+    with col2:
+        st.markdown("### 🎯 Quick Stats")
+        
+        # Load data for stats
+        complaints = load_json(COMPLAINTS_FILE, [])
+        attendance = load_json(ATTENDANCE_FILE, [])
+        events = load_json(EVENTS_FILE, [])
+        
+        # Today's attendance
+        today = str(date.today())
+        today_attendance = [a for a in attendance if a.get('date') == today]
+        
+        st.metric("Total Complaints", len(complaints))
+        st.metric("Today's Attendance", len(today_attendance))
+        st.metric("Upcoming Events", len(events))
+        
+        st.markdown("---")
+        st.markdown("### 🌟 Quote of the Day")
+        st.success(random.choice(MOTIVATIONAL_QUOTES))
+
+# HOSTEL RULES
+elif selected_menu == "📋 Hostel Rules":
+    st.markdown("## 📋 Hostel Rules & Regulations")
+    st.markdown("Please follow these rules to maintain a harmonious living environment for everyone 💝")
+    st.markdown("---")
+    
+    col1, col2 = st.columns(2)
+    
+    for idx, rule in enumerate(HOSTEL_RULES):
+        if idx % 2 == 0:
+            with col1:
+                st.info(f"**{idx + 1}.** {rule}")
         else:
-            # Create new attendance record
-            new_record = {
-                "name": name,
-                "room": room,
-                "date": today,
-                "time": datetime.now().strftime("%H:%M:%S")
-            }
-            
-            attendance_records.append(new_record)
-            save_json_file('attendance.json', attendance_records)
-            
-            print("\n✅ Attendance marked successfully!")
-            print(f"📅 Date: {today}")
-            print(f"⏰ Time: {new_record['time']}")
-            print("💕 Have a wonderful day!")
+            with col2:
+                st.info(f"**{idx + 1}.** {rule}")
     
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-    
-    press_enter()
+    st.markdown("---")
+    st.success("💝 Remember: These rules are for your safety and comfort. Let's all be responsible sisters!")
 
-def show_emergency_contacts():
-    """Display emergency contacts"""
-    print_header("🚨 EMERGENCY CONTACTS")
+# TODAY'S MESS MENU
+elif selected_menu == "🍽️ Today's Mess Menu":
+    st.markdown("## 🍽️ Today's Delicious Menu")
     
-    print("\n📞 Save these numbers for emergencies:\n")
+    # Get current day
+    today_day = datetime.now().strftime("%A")
     
-    for contact, number in EMERGENCY_CONTACTS.items():
-        print(f"  {contact}: {number}")
-    
-    print("\n💝 Stay safe! Don't hesitate to call if you need help.")
-    press_enter()
+    if today_day in WEEKLY_MENU:
+        menu = WEEKLY_MENU[today_day]
+        
+        st.markdown(f"### 📅 {today_day}'s Special Menu")
+        st.markdown("---")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("### 🌅 Breakfast")
+            st.success(menu["Breakfast"])
+        
+        with col2:
+            st.markdown("### ☀️ Lunch")
+            st.info(menu["Lunch"])
+        
+        with col3:
+            st.markdown("### 🌙 Dinner")
+            st.warning(menu["Dinner"])
+        
+        st.markdown("---")
+        
+        # Show full week menu in expander
+        with st.expander("📅 View Full Week Menu"):
+            for day, meals in WEEKLY_MENU.items():
+                st.markdown(f"#### {day}")
+                st.markdown(f"**Breakfast:** {meals['Breakfast']}")
+                st.markdown(f"**Lunch:** {meals['Lunch']}")
+                st.markdown(f"**Dinner:** {meals['Dinner']}")
+                st.markdown("---")
+        
+        st.info("💡 **Tip:** Inform the mess in-charge 2 hours in advance if you'll miss a meal!")
 
-def show_motivational_quote():
-    """Display a random motivational quote"""
-    print_header("💖 MOTIVATION BOOST")
+# SUBMIT COMPLAINT
+elif selected_menu == "📝 Submit Complaint":
+    st.markdown("## 📝 Submit Your Complaint or Suggestion")
+    st.markdown("We value your feedback! Let us know how we can improve. 💝")
+    st.markdown("---")
     
-    quote = random.choice(MOTIVATIONAL_QUOTES)
-    
-    print("\n" + "🌟" * 20)
-    print(f"\n  {quote}\n")
-    print("🌟" * 20)
-    
-    print("\n💕 You've got this, girl! Keep shining!")
-    press_enter()
+    with st.form("complaint_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            name = st.text_input("Your Name (Optional)", placeholder="Enter your name")
+            room_number = st.text_input("Room Number", placeholder="e.g., 101")
+        
+        with col2:
+            category = st.selectbox("Complaint Category", 
+                                   ["Select", "Mess/Food", "Maintenance", "Cleanliness", 
+                                    "Security", "Facilities", "Other"])
+            priority = st.selectbox("Priority", ["Low", "Medium", "High", "Urgent"])
+        
+        complaint_text = st.text_area("Describe your complaint/suggestion", 
+                                      placeholder="Please provide details...",
+                                      height=150)
+        
+        submit_button = st.form_submit_button("📤 Submit Complaint")
+        
+        if submit_button:
+            if not room_number or not complaint_text or category == "Select":
+                st.error("⚠️ Please fill in Room Number, Category, and Complaint details!")
+            else:
+                # Load existing complaints
+                complaints = load_json(COMPLAINTS_FILE, [])
+                
+                # Create new complaint
+                new_complaint = {
+                    "id": len(complaints) + 1,
+                    "name": name if name else "Anonymous",
+                    "room_number": room_number,
+                    "category": category,
+                    "priority": priority,
+                    "complaint": complaint_text,
+                    "status": "Pending",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                
+                complaints.append(new_complaint)
+                
+                # Save to file
+                if save_json(COMPLAINTS_FILE, complaints):
+                    st.success("✅ Your complaint has been submitted successfully! We'll look into it soon. 💝")
+                    st.balloons()
+                else:
+                    st.error("❌ Failed to submit complaint. Please try again.")
 
-def show_health_tip():
-    """Display a random health/study tip"""
-    print_header("🌸 HEALTH & STUDY TIP")
+# VIEW COMPLAINTS
+elif selected_menu == "👀 View Complaints":
+    st.markdown("## 👀 All Complaints & Suggestions")
+    st.markdown("---")
     
-    tip = random.choice(HEALTH_STUDY_TIPS)
-    
-    print("\n" + "💚" * 20)
-    print(f"\n  {tip}\n")
-    print("💚" * 20)
-    
-    print("\n🌺 Take care of yourself - you deserve it!")
-    press_enter()
-
-def view_all_complaints():
-    """Admin view - display all complaints"""
-    print_header("📊 ALL COMPLAINTS (Admin View)")
-    
-    complaints = load_json_file('complaints.json')
+    complaints = load_json(COMPLAINTS_FILE, [])
     
     if not complaints:
-        print("\n✨ No complaints submitted yet!")
-        print("💝 Everything is running smoothly!")
+        st.info("🎉 No complaints yet! Everything is running smoothly!")
     else:
-        print(f"\n📋 Total Complaints: {len(complaints)}\n")
-        for complaint in complaints:
-            print(f"  ID: {complaint['id']}")
-            print(f"  👤 Name: {complaint['name']}")
-            print(f"  🚪 Room: {complaint['room']}")
-            print(f"  💭 Complaint: {complaint['complaint']}")
-            print(f"  📅 Date: {complaint['date']}")
-            print(f"  📌 Status: {complaint['status']}")
-            print_separator()
-    
-    press_enter()
+        # Filter options
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            status_filter = st.selectbox("Filter by Status", 
+                                        ["All", "Pending", "In Progress", "Resolved"])
+        
+        with col2:
+            category_filter = st.selectbox("Filter by Category", 
+                                          ["All", "Mess/Food", "Maintenance", "Cleanliness", 
+                                           "Security", "Facilities", "Other"])
+        
+        with col3:
+            priority_filter = st.selectbox("Filter by Priority",
+                                          ["All", "Low", "Medium", "High", "Urgent"])
+        
+        # Apply filters
+        filtered_complaints = complaints
+        if status_filter != "All":
+            filtered_complaints = [c for c in filtered_complaints if c.get('status') == status_filter]
+        if category_filter != "All":
+            filtered_complaints = [c for c in filtered_complaints if c.get('category') == category_filter]
+        if priority_filter != "All":
+            filtered_complaints = [c for c in filtered_complaints if c.get('priority') == priority_filter]
+        
+        st.markdown(f"**Showing {len(filtered_complaints)} complaint(s)**")
+        st.markdown("---")
+        
+        # Display complaints
+        for complaint in reversed(filtered_complaints):  # Show latest first
+            with st.expander(f"🎫 Complaint #{complaint['id']} - {complaint['category']} ({complaint['status']})"):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"**Name:** {complaint['name']}")
+                    st.markdown(f"**Room:** {complaint['room_number']}")
+                    st.markdown(f"**Category:** {complaint['category']}")
+                    st.markdown(f"**Priority:** {complaint['priority']}")
+                    st.markdown(f"**Date:** {complaint['timestamp']}")
+                    st.markdown("---")
+                    st.markdown(f"**Complaint:**")
+                    st.write(complaint['complaint'])
+                
+                with col2:
+                    # Admin controls to update status
+                    new_status = st.selectbox(f"Status###{complaint['id']}", 
+                                             ["Pending", "In Progress", "Resolved"],
+                                             index=["Pending", "In Progress", "Resolved"].index(complaint['status']))
+                    
+                    if st.button(f"Update###{complaint['id']}"):
+                        complaint['status'] = new_status
+                        if save_json(COMPLAINTS_FILE, complaints):
+                            st.success("✅ Status updated!")
+                            st.rerun()
 
-def add_new_event():
-    """Admin function - add a new event"""
-    print_header("➕ ADD NEW EVENT (Admin)")
+# MARK ATTENDANCE
+elif selected_menu == "✅ Mark Attendance":
+    st.markdown("## ✅ Mark Your Daily Attendance")
+    st.markdown("Please mark your attendance before 10:00 PM daily! 💝")
+    st.markdown("---")
     
-    print("\n🎉 Let's add an exciting event!\n")
+    # Load attendance data
+    attendance = load_json(ATTENDANCE_FILE, [])
+    today = str(date.today())
     
-    try:
-        event_name = input("  🎊 Event Name: ").strip()
-        if not event_name:
-            print("\n❌ Event name cannot be empty!")
-            press_enter()
-            return
+    # Show today's stats
+    today_attendance = [a for a in attendance if a.get('date') == today]
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Today's Date", datetime.now().strftime("%B %d, %Y"))
+    with col2:
+        st.metric("Marked Present Today", len(today_attendance))
+    with col3:
+        attendance_percentage = (len(today_attendance) / 100) * 100  # Assuming 100 residents
+        st.metric("Attendance Rate", f"{attendance_percentage:.0f}%")
+    
+    st.markdown("---")
+    
+    # Attendance form
+    with st.form("attendance_form"):
+        col1, col2 = st.columns(2)
         
-        event_date = input("  📅 Event Date (e.g., 2025-01-15): ").strip()
-        if not event_date:
-            print("\n❌ Event date cannot be empty!")
-            press_enter()
-            return
+        with col1:
+            student_name = st.text_input("Your Name", placeholder="Enter your full name")
         
-        event_details = input("  📝 Event Details: ").strip()
-        if not event_details:
-            print("\n❌ Event details cannot be empty!")
-            press_enter()
-            return
+        with col2:
+            room_number = st.text_input("Room Number", placeholder="e.g., 101")
         
-        # Load existing events
-        events = load_json_file('events.json')
+        submit_attendance = st.form_submit_button("✅ Mark Present")
         
-        # Create new event
-        new_event = {
-            "name": event_name,
-            "date": event_date,
-            "details": event_details,
-            "added_on": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        
-        events.append(new_event)
-        save_json_file('events.json', events)
-        
-        print("\n✅ Event added successfully!")
-        print("🎊 Students will be excited to see this!")
-        
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-    
-    press_enter()
-
-def show_main_menu():
-    """Display the main menu"""
-    print_header("🏠 GIRLS' HOSTEL CHATBOT - MAIN MENU")
-    
-    print("\n💕 Welcome! How can I help you today?\n")
-    
-    menu_options = [
-        "View Hostel Rules",
-        "Today's Mess Menu",
-        "Submit a Complaint",
-        "View Upcoming Events",
-        "Mark Attendance",
-        "Emergency Contacts",
-        "Get Motivational Quote",
-        "Health & Study Tip",
-        "View All Complaints (Admin)",
-        "Add New Event (Admin)",
-        "Exit"
-    ]
-    
-    for i, option in enumerate(menu_options, 1):
-        emoji = ["📋", "🍽️", "📝", "🎉", "✅", "🚨", "💖", "🌸", "📊", "➕", "👋"][i-1]
-        print(f"  {i}. {emoji} {option}")
-    
-    print("\n" + "=" * 60)
-
-# ============================================================================
-# MAIN APPLICATION
-# ============================================================================
-
-def main():
-    """Main application loop"""
-    print("\n" + "🌟" * 30)
-    print("  💝 Welcome to Girls' Hostel Management System 💝")
-    print("🌟" * 30)
-    print("\n✨ Your comfort and safety are our priorities!")
-    print("💕 Feel free to use any feature below.\n")
-    
-    press_enter()
-    
-    while True:
-        show_main_menu()
-        
-        try:
-            choice = input("\n💬 Enter your choice (1-11): ").strip()
-            
-            if choice == '1':
-                view_hostel_rules()
-            elif choice == '2':
-                show_mess_menu()
-            elif choice == '3':
-                submit_complaint()
-            elif choice == '4':
-                view_upcoming_events()
-            elif choice == '5':
-                mark_attendance()
-            elif choice == '6':
-                show_emergency_contacts()
-            elif choice == '7':
-                show_motivational_quote()
-            elif choice == '8':
-                show_health_tip()
-            elif choice == '9':
-                view_all_complaints()
-            elif choice == '10':
-                add_new_event()
-            elif choice == '11':
-                print_header("👋 GOODBYE!")
-                print("\n💕 Thank you for using the Girls' Hostel Chatbot!")
-                print("✨ Have a wonderful day!")
-                print("🌟 Stay safe and keep shining!\n")
-                break
+        if submit_attendance:
+            if not student_name or not room_number:
+                st.error("⚠️ Please enter both Name and Room Number!")
             else:
-                print("\n❌ Invalid choice! Please enter a number between 1 and 11.")
-                press_enter()
-        
-        except KeyboardInterrupt:
-            print("\n\n👋 Goodbye! Take care! 💕\n")
-            break
-        except Exception as e:
-            print(f"\n❌ An error occurred: {e}")
-            print("💭 Please try again!")
-            press_enter()
+                # Check if already marked today
+                already_marked = any(
+                    a.get('name') == student_name and 
+                    a.get('room_number') == room_number and 
+                    a.get('date') == today 
+                    for a in attendance
+                )
+                
+                if already_marked:
+                    st.warning("⚠️ You've already marked attendance today!")
+                else:
+                    new_attendance = {
+                        "name": student_name,
+                        "room_number": room_number,
+                        "date": today,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
+                    
+                    attendance.append(new_attendance)
+                    
+                    if save_json(ATTENDANCE_FILE, attendance):
+                        st.success(f"✅ Attendance marked successfully for {student_name}! 🎉")
+                        st.balloons()
+                    else:
+                        st.error("❌ Failed to mark attendance. Please try again.")
+    
+    st.markdown("---")
+    
+    # Show today's attendance list
+    with st.expander("📋 View Today's Attendance List"):
+        if today_attendance:
+            for idx, record in enumerate(today_attendance, 1):
+                st.markdown(f"{idx}. **{record['name']}** - Room {record['room_number']} ✅")
+        else:
+            st.info("No one has marked attendance yet today!")
 
-if __name__ == "__main__":
-    main()
+# UPCOMING EVENTS
+elif selected_menu == "🎉 Upcoming Events":
+    st.markdown("## 🎉 Upcoming Events & Activities")
+    st.markdown("Stay connected with hostel happenings! 💝")
+    st.markdown("---")
+    
+    events = load_json(EVENTS_FILE, [])
+    
+    if not events:
+        st.info("📅 No upcoming events scheduled yet. Stay tuned!")
+    else:
+        # Sort events by date
+        events_sorted = sorted(events, key=lambda x: x.get('date', ''))
+        
+        for event in events_sorted:
+            event_date = datetime.strptime(event['date'], "%Y-%m-%d")
+            days_until = (event_date.date() - date.today()).days
+            
+            if days_until >= 0:
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"### 🎊 {event['name']}")
+                    st.markdown(f"**📅 Date:** {event_date.strftime('%B %d, %Y')}")
+                    st.markdown(f"**📝 Description:** {event['description']}")
+                
+                with col2:
+                    if days_until == 0:
+                        st.error("🔥 TODAY!")
+                    elif days_until == 1:
+                        st.warning("⏰ Tomorrow")
+                    else:
+                        st.info(f"📆 In {days_until} days")
+                
+                st.markdown("---")
+    
+    st.success("💡 **Tip:** Check back regularly for updates on events and activities!")
+
+# ADD EVENT
+elif selected_menu == "➕ Add Event":
+    st.markdown("## ➕ Add New Event")
+    st.markdown("Schedule a new hostel event or activity! 🎉")
+    st.markdown("---")
+    
+    with st.form("event_form"):
+        event_name = st.text_input("Event Name", placeholder="e.g., Cultural Night")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            event_date = st.date_input("Event Date", min_value=date.today())
+        
+        with col2:
+            event_type = st.selectbox("Event Type", 
+                                     ["Cultural", "Sports", "Educational", "Festival", "Social", "Other"])
+        
+        event_description = st.text_area("Event Description", 
+                                        placeholder="Provide details about the event...",
+                                        height=120)
+        
+        submit_event = st.form_submit_button("🎉 Add Event")
+        
+        if submit_event:
+            if not event_name or not event_description:
+                st.error("⚠️ Please fill in Event Name and Description!")
+            else:
+                events = load_json(EVENTS_FILE, [])
+                
+                new_event = {
+                    "id": len(events) + 1,
+                    "name": event_name,
+                    "date": str(event_date),
+                    "type": event_type,
+                    "description": event_description,
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                
+                events.append(new_event)
+                
+                if save_json(EVENTS_FILE, events):
+                    st.success("✅ Event added successfully! 🎊")
+                    st.balloons()
+                else:
+                    st.error("❌ Failed to add event. Please try again.")
+
+# EMERGENCY CONTACTS
+elif selected_menu == "🚨 Emergency Contacts":
+    st.markdown("## 🚨 Emergency Contacts")
+    st.markdown("Save these numbers! Your safety is our priority. 💝")
+    st.markdown("---")
+    
+    col1, col2 = st.columns(2)
+    
+    for idx, contact in enumerate(EMERGENCY_CONTACTS):
+        if idx % 2 == 0:
+            with col1:
+                st.error(f"**{contact['name']}**\n\n{contact['number']}")
+        else:
+            with col2:
+                st.error(f"**{contact['name']}**\n\n{contact['number']}")
+    
+    st.markdown("---")
+    st.warning("⚠️ **Important:** In case of any emergency, don't hesitate to call. Your safety matters!")
+    
+    st.info("""
+    **When to call:**
+    - 🚨 Any immediate danger or threat
+    - 🤒 Medical emergencies
+    - 🔧 Urgent maintenance issues (water leak, electrical problems)
+    - 🔒 Security concerns
+    - 💔 If you need someone to talk to
+    
+    Remember, no problem is too small. We're here to help! 💝
+    """)
+
+# MOTIVATIONAL QUOTE
+elif selected_menu == "✨ Motivational Quote":
+    st.markdown("## ✨ Get Inspired, Sister!")
+    st.markdown("Need a little boost? Click the button below! 💝")
+    st.markdown("---")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        if st.button("🌟 Give Me Motivation!", use_container_width=True):
+            quote = random.choice(MOTIVATIONAL_QUOTES)
+            st.session_state['current_quote'] = quote
+    
+    if 'current_quote' in st.session_state:
+        st.markdown("---")
+        st.success(f"### {st.session_state['current_quote']}")
+        st.markdown("---")
+        st.markdown("*You're doing amazing! Keep going!* 💪")
+    
+    st.markdown("---")
+    
+    # Show all quotes in expander
+    with st.expander("📚 View All Quotes"):
+        for idx, quote in enumerate(MOTIVATIONAL_QUOTES, 1):
+            st.markdown(f"{idx}. {quote}")
+
+# HEALTH & STUDY TIPS
+elif selected_menu == "💖 Health & Study Tips":
+    st.markdown("## 💖 Health & Study Tips for You")
+    st.markdown("Taking care of yourself is important, sister! 🌸")
+    st.markdown("---")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        if st.button("💡 Get a Random Tip!", use_container_width=True):
+            tip = random.choice(HEALTH_TIPS)
+            st.session_state['current_tip'] = tip
+    
+    if 'current_tip' in st.session_state:
+        st.markdown("---")
+        st.info(f"### {st.session_state['current_tip']}")
+        st.markdown("---")
+    
+    st.markdown("---")
+    
+    # Categories of tips
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        with st.expander("🩺 Health Tips"):
+            health_tips = [tip for tip in HEALTH_TIPS if any(word in tip for word in 
+                          ["health", "water", "sleep", "period", "pain", "medical", "sunlight"])]
+            for tip in health_tips:
+                st.markdown(f"• {tip}")
+    
+    with col2:
+        with st.expander("📚 Study Tips"):
+            study_tips = [tip for tip in HEALTH_TIPS if any(word in tip for word in 
+                         ["study", "break", "screen", "productivity", "retention"])]
+            for tip in study_tips:
+                st.markdown(f"• {tip}")
+    
+    st.markdown("---")
+    st.success("💝 Remember: Your health and well-being come first. Take care of yourself!")
+
+# STATISTICS DASHBOARD
+elif selected_menu == "📊 Statistics Dashboard":
+    st.markdown("## 📊 Hostel Statistics Dashboard")
+    st.markdown("Quick overview of hostel activities 📈")
+    st.markdown("---")
+    
+    # Load all data
+    complaints = load_json(COMPLAINTS_FILE, [])
+    attendance = load_json(ATTENDANCE_FILE, [])
+    events = load_json(EVENTS_FILE, [])
+    
+    # Overall stats
+    st.markdown("### 🎯 Overall Statistics")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Complaints", len(complaints), 
+                 delta=f"{len([c for c in complaints if c.get('status') == 'Pending'])} pending")
+    
+    with col2:
+        today = str(date.today())
+    today_attendance = [a for a in attendance if a.get('date') == today]
+    st.metric("Today's Attendance", len(today_attendance))
+
+with col3:
+    upcoming_events = len([e for e in events if 
+                         datetime.strptime(e.get('date', '2000-01-01'), "%Y-%m-%d").date() >= date.today()])
+    st.metric("Upcoming Events", upcoming_events)
+
+with col4:
+    total_attendance_records = len(attendance)
+    st.metric("Total Attendance Records", total_attendance_records)
+
+st.markdown("---")
+
+# Complaints breakdown
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("### 📝 Complaints Status")
+    if complaints:
+        pending = len([c for c in complaints if c.get('status') == 'Pending'])
+        in_progress = len([c for c in complaints if c.get('status') == 'In Progress'])
+        resolved = len([c for c in complaints if c.get('status') == 'Resolved'])
+        
+        st.success(f"✅ Resolved: {resolved}")
+        st.warning(f"⏳ In Progress: {in_progress}")
+        st.error(f"⏰ Pending: {pending}")
+    else:
+        st.info("No complaints data available")
+
+with col2:
+    st.markdown("### 🏷️ Complaints by Category")
+    if complaints:
+        categories = {}
+        for c in complaints:
+            cat = c.get('category', 'Other')
+            categories[cat] = categories.get(cat, 0) + 1
+        
+        for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True):
+            st.markdown(f"**{cat}:** {count}")
+    else:
+        st.info("No complaints data available")
+
+st.markdown("---")
+
+# Attendance trends
+st.markdown("### 📅 Recent Attendance (Last 7 Days)")
+if attendance:
+    # Get last 7 days
+    recent_dates = {}
+    for i in range(7):
+        check_date = date.today() - __import__('datetime').timedelta(days=i)
+        date_str = str(check_date)
+        count = len([a for a in attendance if a.get('date') == date_str])
+        recent_dates[check_date.strftime("%b %d")] = count
+    
+    # Display as columns
+    cols = st.columns(7)
+    for idx, (day, count) in enumerate(reversed(list(recent_dates.items()))):
+        with cols[idx]:
+            st.metric(day, count)
+else:
+    st.info("No attendance data available")
+
+st.markdown("---")
+st.success("💝 Data is updated in real-time as sisters use the system!")
