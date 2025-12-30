@@ -1,6 +1,13 @@
-# HostelHelper - Girls' Hostel Management Chatbot
-# This project uses only Python standard library modules
-# No external dependencies required!
-
-# Optional: For colored terminal output (not required for core functionality)
-# termcolor==2.4.0
+streamlit
+PyPDF2
+langchain
+langchain-community
+sentence-transformers
+faiss-cpu  # no version
+torch  # no version, hopes for CPU wheel
+transformers
+nltk
+spacy
+pandas
+numpy
+Pillow
